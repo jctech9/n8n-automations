@@ -1,0 +1,338 @@
+{
+  "name": "01 - Monitor Ubuntu e Docker - Telegram",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6f01df51-b43a-45fa-b58d-1101429533dd",
+      "name": "Teste manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "bb3ac300-a1f7-4aba-a9c7-0fab0d723fc2",
+      "name": "A cada 5 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -720,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "4b22823e-ad86-4cb7-b08c-92a44c9be719",
+      "name": "Relatorio diario 08h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -720,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d123927a-97b1-46f7-a99f-52d1415898a9",
+              "name": "mode",
+              "value": "manual",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "76ed2c4a-8297-4016-bbd9-4d7e95e60d31",
+      "name": "Modo teste",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -480,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dd764dee-2fc3-4891-9036-c72fa59a0e73",
+              "name": "mode",
+              "value": "monitor",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1dbbf6e0-e26e-43e5-b1ae-8f5c71303470",
+      "name": "Modo monitoramento",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -480,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e0aed4b8-a5d3-4b5f-a8c7-31495877ef67",
+              "name": "mode",
+              "value": "daily",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "158847ac-6fca-444a-82e0-465ce7eab07e",
+      "name": "Modo relatorio diario",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowedModes = new Set(['manual', 'monitor', 'daily']);\nconst requestedMode = String($input.first().json.mode || 'monitor');\nconst mode = allowedModes.has(requestedMode) ? requestedMode : 'monitor';\n\nconst command = `set -u\nprintf 'MODE=${mode}\\\\n'\nprintf 'TIMESTAMP=%s\\\\n' \"$(date -Iseconds)\"\nprintf 'HOSTNAME_B64=%s\\\\n' \"$(hostname | base64 | tr -d '\\\\n')\"\nprintf 'OS_B64=%s\\\\n' \"$(. /etc/os-release 2>/dev/null; printf '%s %s' \"\\${NAME:-Linux}\" \"\\${VERSION_ID:-}\" | base64 | tr -d '\\\\n')\"\nprintf 'KERNEL_B64=%s\\\\n' \"$(uname -r | base64 | tr -d '\\\\n')\"\nprintf 'IP_B64=%s\\\\n' \"$(hostname -I 2>/dev/null | awk '{print $1}' | base64 | tr -d '\\\\n')\"\nprintf 'UPTIME_SECONDS=%s\\\\n' \"$(cut -d. -f1 /proc/uptime)\"\nprintf 'CPU_CORES=%s\\\\n' \"$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc)\"\nset -- $(head -n1 /proc/stat)\nu1=$2; n1=$3; s1=$4; i1=$5; w1=$6; irq1=$7; sirq1=$8; st1=$9\nt1=$((u1+n1+s1+i1+w1+irq1+sirq1+st1)); idle1=$((i1+w1))\nsleep 1\nset -- $(head -n1 /proc/stat)\nu2=$2; n2=$3; s2=$4; i2=$5; w2=$6; irq2=$7; sirq2=$8; st2=$9\nt2=$((u2+n2+s2+i2+w2+irq2+sirq2+st2)); idle2=$((i2+w2))\nprintf 'CPU_PERCENT=%s\\\\n' \"$(awk -v dt=$((t2-t1)) -v di=$((idle2-idle1)) 'BEGIN { if (dt > 0) printf \"%.1f\", (dt-di)*100/dt; else print \"0.0\" }')\"\nmem_total=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)\nmem_available=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)\nprintf 'MEM_TOTAL_KB=%s\\\\n' \"$mem_total\"\nprintf 'MEM_AVAILABLE_KB=%s\\\\n' \"$mem_available\"\nprintf 'MEM_PERCENT=%s\\\\n' \"$(awk -v t=\"$mem_total\" -v a=\"$mem_available\" 'BEGIN { if (t > 0) printf \"%.1f\", (t-a)*100/t; else print \"0.0\" }')\"\nprintf 'DISK_TOTAL_KB=%s\\\\n' \"$(df -Pk / | awk 'NR==2 {print $2}')\"\nprintf 'DISK_USED_KB=%s\\\\n' \"$(df -Pk / | awk 'NR==2 {print $3}')\"\nprintf 'DISK_AVAILABLE_KB=%s\\\\n' \"$(df -Pk / | awk 'NR==2 {print $4}')\"\nprintf 'DISK_PERCENT=%s\\\\n' \"$(df -Pk / | awk 'NR==2 {gsub(/%/, \"\", $5); print $5}')\"\nprintf 'LOAD_1=%s\\\\n' \"$(awk '{print $1}' /proc/loadavg)\"\nprintf 'LOAD_5=%s\\\\n' \"$(awk '{print $2}' /proc/loadavg)\"\nprintf 'LOAD_15=%s\\\\n' \"$(awk '{print $3}' /proc/loadavg)\"\nif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then\n  docker_running=\"$(docker ps --format '{{.Names}}|{{.Status}}|{{.Image}}|{{.Label \"com.docker.compose.service\"}}' 2>/dev/null)\"\n  docker_all=\"$(docker ps -a --format '{{.Names}}|{{.Status}}|{{.Image}}|{{.Label \"com.docker.compose.service\"}}' 2>/dev/null)\"\n  n8n_running=\"$(printf '%s\\\\n' \"$docker_running\" | awk -F '|' 'tolower($4) == \"n8n\" || tolower($3) ~ /(^|\\\\/)n8n([:@]|$)/ || tolower($3) ~ /n8nio\\\\/n8n/ || tolower($1) == \"n8n\" {c++} END {print c+0}')\"\n  n8n_all=\"$(printf '%s\\\\n' \"$docker_all\" | awk -F '|' 'tolower($4) == \"n8n\" || tolower($3) ~ /(^|\\\\/)n8n([:@]|$)/ || tolower($3) ~ /n8nio\\\\/n8n/ || tolower($1) == \"n8n\"')\"\n  printf 'DOCKER_ACCESS=1\\\\n'\n  printf 'DOCKER_VERSION_B64=%s\\\\n' \"$(docker version --format '{{.Server.Version}}' 2>/dev/null | base64 | tr -d '\\\\n')\"\n  printf 'DOCKER_RUNNING=%s\\\\n' \"$(printf '%s\\\\n' \"$docker_running\" | awk 'NF {c++} END {print c+0}')\"\n  printf 'DOCKER_TOTAL=%s\\\\n' \"$(printf '%s\\\\n' \"$docker_all\" | awk 'NF {c++} END {print c+0}')\"\n  printf 'N8N_RUNNING=%s\\\\n' \"$n8n_running\"\n  printf 'N8N_CONTAINERS_B64=%s\\\\n' \"$(printf '%s' \"$n8n_all\" | base64 | tr -d '\\\\n')\"\n  printf 'DOCKER_ERROR_B64=\\\\n'\nelse\n  docker_error=\"$(docker info 2>&1 | tail -n 3)\"\n  printf 'DOCKER_ACCESS=0\\\\n'\n  printf 'DOCKER_VERSION_B64=\\\\n'\n  printf 'DOCKER_RUNNING=0\\\\n'\n  printf 'DOCKER_TOTAL=0\\\\n'\n  printf 'N8N_RUNNING=0\\\\n'\n  printf 'N8N_CONTAINERS_B64=\\\\n'\n  printf 'DOCKER_ERROR_B64=%s\\\\n' \"$(printf '%s' \"$docker_error\" | base64 | tr -d '\\\\n')\"\nfi`;\n\nreturn [{ json: { mode, command } }];"
+      },
+      "id": "fc3e9e10-171d-4a33-8718-a7f6721ac811",
+      "name": "Preparar coleta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "privateKey",
+        "resource": "command",
+        "operation": "execute",
+        "command": "={{ $json.command }}",
+        "cwd": "/"
+      },
+      "id": "d309b1f0-8be7-4e22-b1c3-c7d61329c878",
+      "name": "Coletar status via SSH",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        40,
+        220
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const CONFIG = {\n  // Edite estes valores antes de ativar o workflow.\n  telegramChatId: 'SUBSTITUA_PELO_CHAT_ID',\n  cpuLimitPercent: 85,\n  memoryLimitPercent: 85,\n  diskLimitPercent: 85,\n  loadPerCpuLimit: 1.5,\n  alertRepeatMinutes: 60,\n  rebootWindowMinutes: 10,\n};\n\nconst input = $input.first().json;\nlet mode = 'monitor';\ntry {\n  mode = String($('Preparar coleta').first().json.mode || mode);\n} catch (_) {}\n\nconst decode = (value) => {\n  if (!value) return '';\n  try { return Buffer.from(String(value), 'base64').toString('utf8'); } catch (_) { return ''; }\n};\nconst escapeHtml = (value) => String(value ?? '')\n  .replaceAll('&', '&amp;')\n  .replaceAll('<', '&lt;')\n  .replaceAll('>', '&gt;');\nconst num = (value, fallback = 0) => {\n  const parsed = Number(value);\n  return Number.isFinite(parsed) ? parsed : fallback;\n};\nconst parseLines = (stdout) => {\n  const result = {};\n  for (const line of String(stdout || '').split(/\\r?\\n/)) {\n    const separator = line.indexOf('=');\n    if (separator < 1) continue;\n    result[line.slice(0, separator)] = line.slice(separator + 1);\n  }\n  return result;\n};\nconst formatUptime = (seconds) => {\n  let remaining = Math.max(0, Math.floor(seconds));\n  const days = Math.floor(remaining / 86400); remaining %= 86400;\n  const hours = Math.floor(remaining / 3600); remaining %= 3600;\n  const minutes = Math.floor(remaining / 60);\n  return [days ? `${days}d` : '', hours ? `${hours}h` : '', `${minutes}min`].filter(Boolean).join(' ');\n};\nconst gb = (kb) => `${(num(kb) / 1024 / 1024).toFixed(1)} GB`;\n\nif (input.error || num(input.code, 0) !== 0) {\n  const reason = escapeHtml(input.error || input.stderr || `Comando SSH terminou com codigo ${input.code}`);\n  return [{ json: {\n    chatId: CONFIG.telegramChatId,\n    severity: 'critical',\n    message: `🚨 <b>MONITOR INDISPONIVEL</b>\\n\\nNao foi possivel coletar o status do Ubuntu por SSH.\\n<b>Motivo:</b> <code>${reason.slice(0, 1200)}</code>\\n\\nVerifique a credencial SSH, o servico sshd e a rota do container n8n para o host.`,\n  } }];\n}\n\nconst data = parseLines(input.stdout);\nmode = data.MODE || mode;\nconst cpu = num(data.CPU_PERCENT);\nconst memory = num(data.MEM_PERCENT);\nconst disk = num(data.DISK_PERCENT);\nconst cores = Math.max(1, num(data.CPU_CORES, 1));\nconst load1 = num(data.LOAD_1);\nconst loadPerCpu = load1 / cores;\nconst uptimeSeconds = num(data.UPTIME_SECONDS);\nconst dockerAccess = data.DOCKER_ACCESS === '1';\nconst n8nRunning = num(data.N8N_RUNNING);\nconst n8nContainers = decode(data.N8N_CONTAINERS_B64);\nconst dockerError = decode(data.DOCKER_ERROR_B64);\nconst alerts = [];\n\nif (cpu >= CONFIG.cpuLimitPercent) alerts.push({ code: 'cpu', text: `CPU em ${cpu.toFixed(1)}% (limite ${CONFIG.cpuLimitPercent}%)` });\nif (memory >= CONFIG.memoryLimitPercent) alerts.push({ code: 'memory', text: `Memoria em ${memory.toFixed(1)}% (limite ${CONFIG.memoryLimitPercent}%)` });\nif (disk >= CONFIG.diskLimitPercent) alerts.push({ code: 'disk', text: `Disco raiz em ${disk.toFixed(1)}% (limite ${CONFIG.diskLimitPercent}%)` });\nif (loadPerCpu >= CONFIG.loadPerCpuLimit) alerts.push({ code: 'load', text: `Carga por CPU em ${loadPerCpu.toFixed(2)} (limite ${CONFIG.loadPerCpuLimit})` });\nif (!dockerAccess) alerts.push({ code: 'docker_access', text: `Docker indisponivel para o usuario SSH${dockerError ? `: ${dockerError.slice(0, 180)}` : ''}` });\nif (dockerAccess && n8nRunning < 1) alerts.push({ code: 'n8n_stopped', text: 'Nenhum container n8n esta em execucao' });\nif (/unhealthy/i.test(n8nContainers)) alerts.push({ code: 'n8n_unhealthy', text: 'O container n8n esta marcado como unhealthy' });\nif (uptimeSeconds > 0 && uptimeSeconds < CONFIG.rebootWindowMinutes * 60) alerts.push({ code: 'recent_reboot', text: `Servidor reiniciado ha ${formatUptime(uptimeSeconds)}` });\n\nconst hostname = escapeHtml(decode(data.HOSTNAME_B64) || 'servidor');\nconst os = escapeHtml(decode(data.OS_B64) || 'Linux');\nconst kernel = escapeHtml(decode(data.KERNEL_B64));\nconst ip = escapeHtml(decode(data.IP_B64));\nconst dockerVersion = escapeHtml(decode(data.DOCKER_VERSION_B64) || 'n/d');\nconst n8nDetails = escapeHtml(n8nContainers || 'nenhum container n8n encontrado').slice(0, 1000);\nconst alertBlock = alerts.length\n  ? `\\n\\n<b>Problemas encontrados:</b>\\n${alerts.map((alert) => `• ${escapeHtml(alert.text)}`).join('\\n')}`\n  : '';\nconst report = `<b>Servidor:</b> ${hostname}${ip ? ` (${ip})` : ''}\\n<b>Sistema:</b> ${os}${kernel ? ` / ${kernel}` : ''}\\n<b>Uptime:</b> ${formatUptime(uptimeSeconds)}\\n\\n<b>CPU:</b> ${cpu.toFixed(1)}% | ${cores} vCPU | load ${escapeHtml(data.LOAD_1 || '0')}\\n<b>Memoria:</b> ${memory.toFixed(1)}% de ${gb(data.MEM_TOTAL_KB)}\\n<b>Disco /:</b> ${disk.toFixed(1)}% de ${gb(data.DISK_TOTAL_KB)}\\n\\n<b>Docker:</b> ${dockerAccess ? 'acessivel' : 'indisponivel'} | v${dockerVersion}\\n<b>Containers:</b> ${num(data.DOCKER_RUNNING)} rodando / ${num(data.DOCKER_TOTAL)} total\\n<b>n8n:</b> ${n8nRunning} rodando\\n<code>${n8nDetails}</code>${alertBlock}`;\n\nconst now = Date.now();\nlet send = mode === 'manual' || mode === 'daily';\nlet title = alerts.length ? '🚨 ALERTA NO SERVIDOR' : '✅ STATUS DO SERVIDOR';\n\nif (mode === 'monitor') {\n  const state = $getWorkflowStaticData('global');\n  const fingerprint = alerts.map((alert) => alert.code).sort().join('|');\n  const previousStatus = state.lastStatus || 'unknown';\n  const lastAlertAt = num(state.lastAlertAt);\n  const repeatDue = now - lastAlertAt >= CONFIG.alertRepeatMinutes * 60 * 1000;\n\n  if (alerts.length) {\n    send = fingerprint !== state.lastFingerprint || repeatDue;\n    if (send) state.lastAlertAt = now;\n    state.lastFingerprint = fingerprint;\n    state.lastStatus = 'alert';\n  } else {\n    send = previousStatus === 'alert';\n    state.lastFingerprint = '';\n    state.lastStatus = 'healthy';\n    if (send) title = '✅ SERVIDOR RECUPERADO';\n  }\n}\n\nif (!send) return [];\nreturn [{ json: {\n  chatId: CONFIG.telegramChatId,\n  severity: alerts.length ? 'alert' : 'ok',\n  message: `${title}\\n\\n${report}`,\n} }];"
+      },
+      "id": "bf442221-69d2-40b6-83dd-085a8e4f7eec",
+      "name": "Avaliar e montar mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "070762bd-ae57-4a0d-877c-9da284984488",
+      "name": "Enviar para Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        220
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "content": "## Configuracao obrigatoria\n\n1. Em **Avaliar e montar mensagem**, troque `SUBSTITUA_PELO_CHAT_ID`.\n2. Em **Coletar status via SSH**, selecione uma credencial SSH com chave privada para o Ubuntu host.\n3. Em **Enviar para Telegram**, selecione a credencial do bot.\n4. Execute **Teste manual**. Se funcionar, salve e publique o workflow.\n\nOs limites tambem ficam no inicio do node **Avaliar e montar mensagem**.",
+        "height": 360,
+        "width": 520,
+        "color": 5
+      },
+      "id": "b06259d3-edb1-488d-9ccf-9904359d48dc",
+      "name": "Leia antes de ativar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -740,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Comportamento\n\n- Verifica a cada 5 minutos.\n- Envia alerta novo e repete a cada 60 minutos enquanto persistir.\n- Envia mensagem de recuperacao.\n- Envia relatorio diario as 08:00.\n- O teste manual sempre envia.\n\nTimezone do workflow: `America/Sao_Paulo`.",
+        "height": 300,
+        "width": 440,
+        "color": 4
+      },
+      "id": "efb86012-5d0c-456a-9235-330b20f09754",
+      "name": "Como funciona",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        20,
+        -300
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Teste manual": {
+      "main": [
+        [
+          {
+            "node": "Modo teste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "Modo monitoramento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Relatorio diario 08h": {
+      "main": [
+        [
+          {
+            "node": "Modo relatorio diario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modo teste": {
+      "main": [
+        [
+          {
+            "node": "Preparar coleta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modo monitoramento": {
+      "main": [
+        [
+          {
+            "node": "Preparar coleta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modo relatorio diario": {
+      "main": [
+        [
+          {
+            "node": "Preparar coleta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar coleta": {
+      "main": [
+        [
+          {
+            "node": "Coletar status via SSH",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coletar status via SSH": {
+      "main": [
+        [
+          {
+            "node": "Avaliar e montar mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avaliar e montar mensagem": {
+      "main": [
+        [
+          {
+            "node": "Enviar para Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "versionId": "68424f05-ddda-428a-a930-52fdd595fefc",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

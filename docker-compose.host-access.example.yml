@@ -1,0 +1,6 @@
+services:
+  n8n:
+    # Acrescente esta entrada ao servico n8n do seu docker-compose.yml.
+    # Ela permite que o container resolva host.docker.internal para o Ubuntu host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
