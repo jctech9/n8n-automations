@@ -199,6 +199,50 @@ Depois de modificá-los, gere novamente o workflow:
 node scripts/build-reminder-workflow.mjs
 ```
 
+## 03 — Notícias de Quixadá pelo Telegram
+
+Arquivo para importar:
+
+`workflows/03-noticias-quixada-telegram.json`
+
+Este workflow não utiliza IA. A cada cinco minutos ele:
+
+- lê os feeds gerais da Revista Central e do Monolitos Post;
+- lê também os feeds de busca por Quixadá dos dois sites;
+- reúne e deduplica as notícias pela URL;
+- baixa o artigo completo somente quando encontra um link novo;
+- verifica título, resumo, conteúdo, categorias, URL e referências locais;
+- envia casos confirmados ao Telegram;
+- em falhas de leitura, envia como **Possível relação** para priorizar cobertura;
+- reprocessa uma URL se o título, a data ou o resumo do RSS mudar.
+
+Na primeira execução agendada, o workflow apenas registra as notícias atuais como
+linha de base. Isso evita o envio de várias matérias antigas logo após a
+ativação. O gatilho manual envia no máximo uma notícia recente para teste.
+
+### Configuração
+
+1. Importe `workflows/03-noticias-quixada-telegram.json`.
+2. No node **Filtrar e montar mensagem**, substitua
+   `SUBSTITUA_PELO_CHAT_ID`.
+3. No node **Enviar notícia para Telegram**, selecione a credencial do bot.
+4. Execute **Teste manual**.
+5. Salve e publique/ative o workflow.
+
+O workflow não recebe eventos do Telegram e, portanto, não precisa de URL
+pública ou webhook HTTPS. Ele faz somente conexões de saída.
+
+As referências locais editáveis ficam no início de:
+
+`workflow-sources/03-news-quixada/filter-and-message.js`
+
+Depois de alterar o código-fonte, gere e teste novamente:
+
+```bash
+node scripts/build-news-workflow.mjs
+node scripts/test-news-workflow.mjs
+```
+
 ## Fontes
 
 - Código-fonte do n8n: <https://github.com/n8n-io/n8n>

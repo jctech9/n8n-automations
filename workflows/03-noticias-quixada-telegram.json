@@ -1,0 +1,636 @@
+{
+  "name": "03 - Notícias de Quixadá - Telegram",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1ae42496-0aba-4af1-a5bc-56976d2ddee0",
+      "name": "Teste manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1420,
+        -940
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "80ec3755-2af7-4ad0-a6e2-fb8a49eef710",
+      "name": "A cada 5 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1420,
+        -740
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://revistacentral.com.br/feed/",
+        "options": {
+          "customFields": "content:encoded,content:encodedSnippet,dc:creator"
+        }
+      },
+      "id": "32c1b483-0fe4-437d-aa3d-5acaa9ba2827",
+      "name": "Ler Revista Central - geral",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        -980
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://revistacentral.com.br/?s=Quixad%C3%A1&feed=rss2",
+        "options": {
+          "customFields": "content:encoded,content:encodedSnippet,dc:creator"
+        }
+      },
+      "id": "f954103c-a55c-4956-a9f1-39f0f34ec8b1",
+      "name": "Ler Revista Central - busca Quixada",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        -700
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.monolitospost.com/feed/",
+        "options": {
+          "customFields": "content:encoded,content:encodedSnippet,dc:creator"
+        }
+      },
+      "id": "6b2931fb-881a-4f45-a7f4-f8de08f1b991",
+      "name": "Ler Monolitos Post - geral",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        -420
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.monolitospost.com/?s=Quixad%C3%A1&feed=rss2",
+        "options": {
+          "customFields": "content:encoded,content:encodedSnippet,dc:creator"
+        }
+      },
+      "id": "d1f37ca1-d0ce-4572-a16f-1ee2cc179627",
+      "name": "Ler Monolitos Post - busca Quixada",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        -140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3aedee7c-c6ca-4534-a361-64bac3b5e683",
+              "name": "_source",
+              "value": "Revista Central",
+              "type": "string"
+            },
+            {
+              "id": "356d0684-5409-4c30-ad54-3a10d1668251",
+              "name": "_feedMode",
+              "value": "general",
+              "type": "string"
+            },
+            {
+              "id": "69bcff40-0a57-45ab-a8f0-8b5002944d0b",
+              "name": "_feedUrl",
+              "value": "https://revistacentral.com.br/feed/",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "4ee37ad0-ed11-412e-ad63-925cd7f5b536",
+      "name": "Marcar Revista Central - geral",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -840,
+        -980
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "487ed2b9-a007-4397-a772-fab41a19a7b8",
+              "name": "_source",
+              "value": "Revista Central",
+              "type": "string"
+            },
+            {
+              "id": "869d4c4e-a225-4cca-a6ee-37e943d00b76",
+              "name": "_feedMode",
+              "value": "search",
+              "type": "string"
+            },
+            {
+              "id": "674f2543-4835-4d0d-a79c-bd402202b17d",
+              "name": "_feedUrl",
+              "value": "https://revistacentral.com.br/?s=Quixad%C3%A1&feed=rss2",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "663ae6a1-1ca4-45bb-a1bc-415543e049be",
+      "name": "Marcar Revista Central - busca",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -840,
+        -700
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6fb6c705-0a0f-410b-ab67-4bc5a760c890",
+              "name": "_source",
+              "value": "Monolitos Post",
+              "type": "string"
+            },
+            {
+              "id": "345749dc-8baa-4879-a4a0-e47795fbf642",
+              "name": "_feedMode",
+              "value": "general",
+              "type": "string"
+            },
+            {
+              "id": "9fcd73e1-c670-4a7c-a820-1805cca4c8aa",
+              "name": "_feedUrl",
+              "value": "https://www.monolitospost.com/feed/",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "8b91aa33-e845-46ea-af23-82d99c0cc653",
+      "name": "Marcar Monolitos Post - geral",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -840,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0daee91-3e5f-4964-a86e-8f765c17977a",
+              "name": "_source",
+              "value": "Monolitos Post",
+              "type": "string"
+            },
+            {
+              "id": "a1bf3873-472b-4647-adc5-ef4de93e5337",
+              "name": "_feedMode",
+              "value": "search",
+              "type": "string"
+            },
+            {
+              "id": "0779b19f-80d7-4337-acc8-4f389b724b44",
+              "name": "_feedUrl",
+              "value": "https://www.monolitospost.com/?s=Quixad%C3%A1&feed=rss2",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "5a932357-07bc-4bf4-aa34-9821603f3172",
+      "name": "Marcar Monolitos Post - busca",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -840,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "b479d65e-535a-41d1-aab3-a6c87374734b",
+      "name": "Unir Revista Central",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -580,
+        -840
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "03b79487-45ee-4e76-ae24-1b3c570976da",
+      "name": "Unir Monolitos Post",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -580,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "6f6f5412-3347-462a-a900-04921b42bc81",
+      "name": "Unir todos os feeds",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -340,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const CONFIG = {\n  retentionDays: 180,\n  maxHistory: 10000,\n  manualMaxLinks: 1,\n};\n\nconst state = $getWorkflowStaticData('global');\nstate.processedLinks =\n  state.processedLinks && typeof state.processedLinks === 'object'\n    ? state.processedLinks\n    : {};\n\nconst now = Date.now();\nconst executionMode = String($execution?.mode || 'manual');\n\nconst canonicalize = (value) => {\n  try {\n    const url = new URL(String(value || '').trim());\n    if (!['http:', 'https:'].includes(url.protocol)) return '';\n    for (const key of [...url.searchParams.keys()]) {\n      if (\n        key.toLowerCase().startsWith('utm_') ||\n        ['fbclid', 'gclid', 'ref', 'source'].includes(key.toLowerCase())\n      ) {\n        url.searchParams.delete(key);\n      }\n    }\n    url.hash = '';\n    url.pathname = url.pathname.replace(/\\/+$/, '') || '/';\n    return url.toString();\n  } catch (_) {\n    return '';\n  }\n};\n\nconst hash = (value) => {\n  let result = 2166136261;\n  for (const char of String(value || '')) {\n    result ^= char.charCodeAt(0);\n    result = Math.imul(result, 16777619);\n  }\n  return (result >>> 0).toString(16).padStart(8, '0');\n};\n\nconst publicationTime = (item) => {\n  const parsed = Date.parse(item.isoDate || item.pubDate || item.date || '');\n  return Number.isFinite(parsed) ? parsed : 0;\n};\n\nconst candidates = new Map();\n\nfor (const input of $input.all()) {\n  const item = input.json || {};\n  const canonicalLink = canonicalize(item.link || item.guid);\n  if (!canonicalLink) continue;\n\n  const fingerprint = hash(\n    [\n      item.title || '',\n      item.isoDate || item.pubDate || '',\n      item.contentSnippet || item.description || '',\n    ].join('|'),\n  );\n\n  const existing = candidates.get(canonicalLink);\n  if (!existing) {\n    candidates.set(canonicalLink, {\n      ...item,\n      _canonicalLink: canonicalLink,\n      _fingerprint: fingerprint,\n      _sources: [String(item._source || 'Fonte não identificada')],\n      _feedModes: [String(item._feedMode || 'general')],\n      _publicationTime: publicationTime(item),\n    });\n    continue;\n  }\n\n  existing._sources = [\n    ...new Set([...existing._sources, String(item._source || 'Fonte não identificada')]),\n  ];\n  existing._feedModes = [\n    ...new Set([...existing._feedModes, String(item._feedMode || 'general')]),\n  ];\n\n  const existingText = String(existing.content || existing['content:encoded'] || '');\n  const candidateText = String(item.content || item['content:encoded'] || '');\n  if (candidateText.length > existingText.length) {\n    const preserved = {\n      _canonicalLink: existing._canonicalLink,\n      _fingerprint: existing._fingerprint,\n      _sources: existing._sources,\n      _feedModes: existing._feedModes,\n      _publicationTime: Math.max(existing._publicationTime, publicationTime(item)),\n    };\n    Object.assign(existing, item, preserved);\n  }\n}\n\nconst ordered = [...candidates.values()].sort(\n  (a, b) => b._publicationTime - a._publicationTime,\n);\n\nconst retentionCutoff = now - CONFIG.retentionDays * 86400000;\nfor (const [link, record] of Object.entries(state.processedLinks)) {\n  if (!record || Number(record.at || 0) < retentionCutoff) {\n    delete state.processedLinks[link];\n  }\n}\n\nconst historyEntries = Object.entries(state.processedLinks);\nif (historyEntries.length > CONFIG.maxHistory) {\n  historyEntries\n    .sort((a, b) => Number(a[1]?.at || 0) - Number(b[1]?.at || 0))\n    .slice(0, historyEntries.length - CONFIG.maxHistory)\n    .forEach(([link]) => delete state.processedLinks[link]);\n}\n\n// A primeira execução agendada cria uma linha de base para não disparar\n// dezenas de notícias antigas logo após a ativação.\nif (executionMode !== 'manual' && !state.newsMonitorInitializedAt) {\n  for (const item of ordered) {\n    state.processedLinks[item._canonicalLink] = {\n      at: now,\n      fingerprint: item._fingerprint,\n      baseline: true,\n    };\n  }\n  state.newsMonitorInitializedAt = now;\n  return [];\n}\n\nconst manualCandidates = [\n  ...ordered.filter((item) => item._feedModes.includes('search')),\n  ...ordered.filter((item) => !item._feedModes.includes('search')),\n];\nconst output =\n  executionMode === 'manual'\n    ? manualCandidates.slice(0, CONFIG.manualMaxLinks)\n    : ordered.filter((item) => {\n        const previous = state.processedLinks[item._canonicalLink];\n        return !previous || previous.fingerprint !== item._fingerprint;\n      });\n\nreturn output.map((item) => ({ json: item }));\n"
+      },
+      "id": "af7dbd91-56ea-4aeb-afe8-aea1475c92b9",
+      "name": "Selecionar links novos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json._canonicalLink }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (compatible; n8n Quixada News Monitor/1.0)"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text",
+              "outputPropertyName": "articleHtml"
+            }
+          }
+        }
+      },
+      "id": "73c5e7cf-1b92-4149-aab4-e272a59cad15",
+      "name": "Baixar conteudo completo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        180,
+        -560
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const CONFIG = {\n  telegramChatId: 'SUBSTITUA_PELO_CHAT_ID',\n  manualMaxMessages: 1,\n  summaryMaxCharacters: 1400,\n  localReferences: [\n    'açude cedro',\n    'açude do cedro',\n    'pedra da galinha choca',\n    'serra do estevão',\n    'parque de exposições valdir do couto dinelly',\n    'valdir do couto dinelly',\n    'praça josé de barros',\n    'estádio abilhão',\n    'unicatólica',\n    'centro universitário católica de quixadá',\n    'feclesc',\n    'canarinho do sertão',\n    'quixadá futebol clube',\n    'expocece',\n    'juatama',\n    'tapuiará',\n    'cipó dos anjos',\n    'dom maurício',\n    'são joão dos queiroz',\n  ],\n};\n\nconst inputItems = $input.all();\nconst originalItems = $('Selecionar links novos').all();\nconst state = $getWorkflowStaticData('global');\nstate.processedLinks =\n  state.processedLinks && typeof state.processedLinks === 'object'\n    ? state.processedLinks\n    : {};\n\nconst executionMode = String($execution?.mode || 'manual');\nconst now = Date.now();\n\nconst namedEntities = {\n  amp: '&',\n  lt: '<',\n  gt: '>',\n  quot: '\"',\n  apos: \"'\",\n  nbsp: ' ',\n  aacute: 'á',\n  agrave: 'à',\n  acirc: 'â',\n  atilde: 'ã',\n  eacute: 'é',\n  ecirc: 'ê',\n  iacute: 'í',\n  oacute: 'ó',\n  ocirc: 'ô',\n  otilde: 'õ',\n  uacute: 'ú',\n  ccedil: 'ç',\n};\n\nconst decodeEntities = (value) =>\n  String(value || '').replace(\n    /&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi,\n    (match, entity) => {\n      const lowered = entity.toLowerCase();\n      if (lowered.startsWith('#x')) {\n        const code = Number.parseInt(lowered.slice(2), 16);\n        return Number.isFinite(code) ? String.fromCodePoint(code) : match;\n      }\n      if (lowered.startsWith('#')) {\n        const code = Number.parseInt(lowered.slice(1), 10);\n        return Number.isFinite(code) ? String.fromCodePoint(code) : match;\n      }\n      return namedEntities[lowered] ?? match;\n    },\n  );\n\nconst stripHtml = (value) =>\n  decodeEntities(\n    String(value || '')\n      .replace(/<script\\b[^>]*>[\\s\\S]*?<\\/script>/gi, ' ')\n      .replace(/<style\\b[^>]*>[\\s\\S]*?<\\/style>/gi, ' ')\n      .replace(/<noscript\\b[^>]*>[\\s\\S]*?<\\/noscript>/gi, ' ')\n      .replace(/<!--[\\s\\S]*?-->/g, ' ')\n      .replace(/<[^>]+>/g, ' '),\n  )\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst normalize = (value) =>\n  stripHtml(value)\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase();\n\nconst escapeHtml = (value) =>\n  String(value ?? '')\n    .replaceAll('&', '&amp;')\n    .replaceAll('<', '&lt;')\n    .replaceAll('>', '&gt;')\n    .replaceAll('\"', '&quot;');\n\nconst hasClasses = (openingTag, requiredClasses) => {\n  const match = openingTag.match(/\\bclass\\s*=\\s*[\"']([^\"']+)[\"']/i);\n  if (!match) return false;\n  const classes = new Set(match[1].split(/\\s+/).filter(Boolean));\n  return requiredClasses.every((name) => classes.has(name));\n};\n\nconst extractDivByClasses = (html, requiredClasses) => {\n  const source = String(html || '');\n  const openingPattern = /<div\\b[^>]*>/gi;\n  let opening;\n\n  while ((opening = openingPattern.exec(source))) {\n    if (!hasClasses(opening[0], requiredClasses)) continue;\n    const contentStart = openingPattern.lastIndex;\n    const divPattern = /<\\/?div\\b[^>]*>/gi;\n    divPattern.lastIndex = contentStart;\n    let depth = 1;\n    let tag;\n\n    while ((tag = divPattern.exec(source))) {\n      depth += /^<div\\b/i.test(tag[0]) ? 1 : -1;\n      if (depth === 0) return source.slice(contentStart, tag.index);\n    }\n  }\n  return '';\n};\n\nconst extractArticleBody = (html, sources) => {\n  const sourceName = normalize(sources.join(' '));\n  if (sourceName.includes('revista central')) {\n    return extractDivByClasses(html, ['post_content', 'jl_content']);\n  }\n  if (sourceName.includes('monolitos post')) {\n    return extractDivByClasses(html, ['post']);\n  }\n  return '';\n};\n\nconst directPattern = /\\bquixada(?:ense|enses)?\\b/;\nconst normalizedReferences = CONFIG.localReferences.map(normalize);\nconst dateFormatter = new Intl.DateTimeFormat('pt-BR', {\n  timeZone: 'America/Sao_Paulo',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  hourCycle: 'h23',\n});\n\nconst relevantItems = [];\n\nfor (let index = 0; index < inputItems.length; index++) {\n  const response = inputItems[index]?.json || {};\n  const original = originalItems[index]?.json || {};\n  const sources = Array.isArray(original._sources)\n    ? original._sources\n    : [String(original._source || 'Fonte não identificada')];\n  const feedModes = Array.isArray(original._feedModes)\n    ? original._feedModes\n    : [String(original._feedMode || 'general')];\n\n  const statusCode = Number(response.statusCode || 0);\n  const downloadedHtml = String(response.articleHtml || '');\n  const fetchFailed =\n    Boolean(response.error) ||\n    !downloadedHtml ||\n    (statusCode > 0 && (statusCode < 200 || statusCode >= 400));\n  const extractedHtml = extractArticleBody(downloadedHtml, sources);\n  const selectorFailed = !fetchFailed && !extractedHtml;\n\n  const title = stripHtml(original.title || 'Sem título');\n  const rssContent = [\n    original.contentSnippet,\n    original.content,\n    original['content:encoded'],\n    original.description,\n    JSON.stringify(original.categories || original.category || []),\n  ]\n    .filter(Boolean)\n    .join(' ');\n  const articleText = stripHtml(extractedHtml);\n  const searchable = normalize(\n    [title, rssContent, articleText, original._canonicalLink].join(' '),\n  );\n\n  const directMention = directPattern.test(searchable);\n  const localReference = normalizedReferences.find((term) =>\n    searchable.includes(term),\n  );\n  const cameFromSearch = feedModes.includes('search');\n\n  let relevant = false;\n  let matchReason = '';\n  let confidenceLabel = 'Confirmada';\n\n  if (directMention) {\n    relevant = true;\n    matchReason = 'menção direta a Quixadá';\n  } else if (localReference) {\n    relevant = true;\n    matchReason = `referência local: ${localReference}`;\n  } else if (cameFromSearch) {\n    relevant = true;\n    matchReason = 'resultado da busca por Quixadá no próprio site';\n  } else if (fetchFailed || selectorFailed) {\n    relevant = true;\n    confidenceLabel = 'Possível relação';\n    matchReason = fetchFailed\n      ? 'artigo indisponível para validação'\n      : 'estrutura do artigo não reconhecida';\n  }\n\n  if (executionMode !== 'manual' && original._canonicalLink) {\n    state.processedLinks[original._canonicalLink] = {\n      at: now,\n      fingerprint: original._fingerprint,\n      relevant,\n      reason: matchReason || 'sem relação identificada',\n    };\n  }\n\n  if (!relevant) continue;\n\n  const summarySource =\n    original.contentSnippet ||\n    original.description ||\n    articleText ||\n    'Resumo não disponível.';\n  let summary = stripHtml(summarySource);\n  if (summary.length > CONFIG.summaryMaxCharacters) {\n    summary = `${summary.slice(0, CONFIG.summaryMaxCharacters - 1).trimEnd()}…`;\n  }\n\n  const publishedAt = Number(original._publicationTime || 0);\n  const publishedText = publishedAt\n    ? dateFormatter.format(new Date(publishedAt))\n    : 'data não informada';\n  const link = String(original._canonicalLink || original.link || '');\n  const sourceText = sources.join(', ');\n\n  const message = [\n    '📰 <b>NOTÍCIA SOBRE QUIXADÁ</b>',\n    '',\n    `<b>Classificação:</b> ${escapeHtml(confidenceLabel)}`,\n    `<b>Fonte:</b> ${escapeHtml(sourceText)}`,\n    `<b>Publicada:</b> ${escapeHtml(publishedText)}`,\n    '',\n    `<b>${escapeHtml(title)}</b>`,\n    '',\n    escapeHtml(summary),\n    '',\n    `<i>Motivo do filtro: ${escapeHtml(matchReason)}</i>`,\n    `<a href=\"${escapeHtml(link)}\">Abrir notícia</a>`,\n  ].join('\\n');\n\n  relevantItems.push({\n    json: {\n      chatId: CONFIG.telegramChatId,\n      message,\n      link,\n      title,\n      source: sourceText,\n      classification: confidenceLabel,\n      matchReason,\n      publishedAt,\n    },\n  });\n}\n\nrelevantItems.sort(\n  (a, b) => Number(b.json.publishedAt || 0) - Number(a.json.publishedAt || 0),\n);\n\nreturn executionMode === 'manual'\n  ? relevantItems.slice(0, CONFIG.manualMaxMessages)\n  : relevantItems;\n"
+      },
+      "id": "df7a31f9-d581-4104-aa40-49024a96116b",
+      "name": "Filtrar e montar mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        -560
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "b5f008a9-39d4-443a-a531-ba556903e65e",
+      "name": "Enviar notícia para Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        700,
+        -560
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "content": "## Configuração obrigatória\n\n1. No node **Filtrar e montar mensagem**, troque `SUBSTITUA_PELO_CHAT_ID`.\n2. No node **Enviar notícia para Telegram**, selecione a credencial do bot.\n3. Execute **Teste manual**: ele envia no máximo uma notícia recente.\n4. Salve e publique/ative o workflow.\n\nA primeira execução agendada apenas cria a linha de base e não envia notícias antigas.",
+        "height": 350,
+        "width": 520,
+        "color": 5
+      },
+      "id": "6e37932d-0b37-43e3-a5ec-dfe44b94cdeb",
+      "name": "Configurar antes de ativar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1420,
+        -1360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Cobertura sem IA\n\n- Lê os feeds gerais e os feeds de busca por Quixadá.\n- Baixa o artigo completo somente para links novos.\n- Verifica título, RSS, corpo, categorias, URL e referências locais.\n- Em falha de leitura, envia como **Possível relação** para priorizar cobertura.\n- Deduplica por URL e reprocessa quando o conteúdo do RSS muda.\n- Conserva o histórico por 180 dias.",
+        "height": 350,
+        "width": 520,
+        "color": 4
+      },
+      "id": "221b7c6f-4021-4249-a29f-4f50bb1b65ae",
+      "name": "Como funciona",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        40,
+        -1120
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Teste manual": {
+      "main": [
+        [
+          {
+            "node": "Ler Revista Central - geral",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler Revista Central - busca Quixada",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler Monolitos Post - geral",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler Monolitos Post - busca Quixada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "Ler Revista Central - geral",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler Revista Central - busca Quixada",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler Monolitos Post - geral",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ler Monolitos Post - busca Quixada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Revista Central - geral": {
+      "main": [
+        [
+          {
+            "node": "Marcar Revista Central - geral",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Revista Central - busca Quixada": {
+      "main": [
+        [
+          {
+            "node": "Marcar Revista Central - busca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Monolitos Post - geral": {
+      "main": [
+        [
+          {
+            "node": "Marcar Monolitos Post - geral",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Monolitos Post - busca Quixada": {
+      "main": [
+        [
+          {
+            "node": "Marcar Monolitos Post - busca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Revista Central - geral": {
+      "main": [
+        [
+          {
+            "node": "Unir Revista Central",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Revista Central - busca": {
+      "main": [
+        [
+          {
+            "node": "Unir Revista Central",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Marcar Monolitos Post - geral": {
+      "main": [
+        [
+          {
+            "node": "Unir Monolitos Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Monolitos Post - busca": {
+      "main": [
+        [
+          {
+            "node": "Unir Monolitos Post",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Unir Revista Central": {
+      "main": [
+        [
+          {
+            "node": "Unir todos os feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unir Monolitos Post": {
+      "main": [
+        [
+          {
+            "node": "Unir todos os feeds",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Unir todos os feeds": {
+      "main": [
+        [
+          {
+            "node": "Selecionar links novos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Selecionar links novos": {
+      "main": [
+        [
+          {
+            "node": "Baixar conteudo completo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar conteudo completo": {
+      "main": [
+        [
+          {
+            "node": "Filtrar e montar mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar e montar mensagem": {
+      "main": [
+        [
+          {
+            "node": "Enviar notícia para Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "versionId": "14ac81ff-582c-452f-a070-9c40f91614f3",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
