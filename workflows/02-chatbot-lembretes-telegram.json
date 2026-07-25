@@ -1,0 +1,413 @@
+{
+  "name": "02 - Chatbot de lembretes - Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {
+          "chatIds": "SUBSTITUA_PELO_CHAT_ID"
+        }
+      },
+      "id": "29652a99-70f0-4784-9a44-e20ac892cd1d",
+      "name": "Receber mensagem Telegram",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -760,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const CONFIG = {\n  timezone: 'America/Sao_Paulo',\n  pendingMinutes: 30,\n  retentionDays: 90,\n  maxRemindersPerChat: 500,\n  listLimit: 20,\n};\n\nconst input = $input.first().json;\nconst state = $getWorkflowStaticData('global');\nstate.reminders = Array.isArray(state.reminders) ? state.reminders : [];\nstate.pending = state.pending && typeof state.pending === 'object' ? state.pending : {};\nstate.nextId = Number.isInteger(state.nextId) && state.nextId > 0 ? state.nextId : 1;\n\nconst now = Date.now();\nconst retentionCutoff = now - CONFIG.retentionDays * 86400000;\nfor (const [key, pending] of Object.entries(state.pending)) {\n  if (!pending || Number(pending.expiresAt) < now) delete state.pending[key];\n}\nstate.reminders = state.reminders.filter((reminder) => {\n  if (!['completed', 'cancelled'].includes(reminder.status)) return true;\n  return Number(reminder.updatedAt || reminder.createdAt || 0) >= retentionCutoff;\n});\n\nconst escapeHtml = (value) => String(value ?? '')\n  .replaceAll('&', '&amp;')\n  .replaceAll('<', '&lt;')\n  .replaceAll('>', '&gt;');\nconst normalize = (value) => String(value ?? '')\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '')\n  .toLowerCase();\nconst dateFormatter = new Intl.DateTimeFormat('pt-BR', {\n  timeZone: CONFIG.timezone,\n  weekday: 'short',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  hourCycle: 'h23',\n});\nconst partsFormatter = new Intl.DateTimeFormat('en-CA', {\n  timeZone: CONFIG.timezone,\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit',\n  hour: '2-digit',\n  minute: '2-digit',\n  hourCycle: 'h23',\n});\nconst localParts = (timestamp) => {\n  const result = {};\n  for (const part of partsFormatter.formatToParts(new Date(timestamp))) {\n    if (part.type !== 'literal') result[part.type] = Number(part.value);\n  }\n  return result;\n};\nconst zonedToUtc = (year, month, day, hour, minute) => {\n  const desired = Date.UTC(year, month - 1, day, hour, minute, 0);\n  let candidate = desired;\n  for (let attempt = 0; attempt < 3; attempt++) {\n    const actual = localParts(candidate);\n    const represented = Date.UTC(\n      actual.year,\n      actual.month - 1,\n      actual.day,\n      actual.hour,\n      actual.minute,\n      0,\n    );\n    candidate += desired - represented;\n  }\n  return candidate;\n};\nconst shiftCalendarDate = (year, month, day, days) => {\n  const shifted = new Date(Date.UTC(year, month - 1, day + days));\n  return {\n    year: shifted.getUTCFullYear(),\n    month: shifted.getUTCMonth() + 1,\n    day: shifted.getUTCDate(),\n  };\n};\nconst timestampForDayOffset = (baseTimestamp, days, hour, minute) => {\n  const base = localParts(baseTimestamp);\n  const shifted = shiftCalendarDate(base.year, base.month, base.day, days);\n  return zonedToUtc(shifted.year, shifted.month, shifted.day, hour, minute);\n};\nconst localDateKey = (timestamp) => {\n  const parts = localParts(timestamp);\n  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;\n};\nconst formatDate = (timestamp) => dateFormatter\n  .format(new Date(timestamp))\n  .replace(/, (\\d{2}:\\d{2})$/, ' às $1');\nconst recurrenceLabel = (recurrence) => {\n  if (!recurrence) return 'não se repete';\n  if (recurrence.type === 'daily') return 'todos os dias';\n  if (recurrence.type === 'weekly') return `toda ${recurrence.weekdayName}`;\n  return 'personalizada';\n};\nconst helpMessage = [\n  '🤖 <b>Chatbot de lembretes</b>',\n  '',\n  'Envie frases como:',\n  '• <code>Me lembre amanhã às 09:30 de pagar a internet</code>',\n  '• <code>Daqui a 20 minutos desligar o forno</code>',\n  '• <code>Todo dia às 08h tomar o remédio</code>',\n  '• <code>Toda segunda às 10h enviar o relatório</code>',\n  '• <code>Dia 05/08 às 14h renovar o documento</code>',\n  '',\n  '<b>Comandos</b>',\n  '/listar — próximos lembretes',\n  '/hoje — lembretes de hoje',\n  '/cancelar 12 — cancelar pelo número',\n  '/ajuda — mostrar esta ajuda',\n  '',\n  `Fuso horário: <code>${CONFIG.timezone}</code>`,\n].join('\\n');\n\nconst callback = input.callback_query;\nconst message = input.message;\nconst chatId = String(callback?.message?.chat?.id ?? message?.chat?.id ?? '');\nconst userId = String(callback?.from?.id ?? message?.from?.id ?? '');\n\nif (!chatId) return [];\n\nif (callback) {\n  const callbackData = String(callback.data || '');\n  const result = {\n    isCallback: true,\n    queryId: String(callback.id || ''),\n    callbackText: 'Ação não reconhecida.',\n    showAlert: false,\n    chatId,\n  };\n\n  const confirmation = callbackData.match(/^(confirm|discard):([a-z0-9]+)$/i);\n  if (confirmation) {\n    const action = confirmation[1].toLowerCase();\n    const token = confirmation[2];\n    const key = `${chatId}:${token}`;\n    const pending = state.pending[key];\n\n    if (!pending || Number(pending.expiresAt) < now) {\n      delete state.pending[key];\n      result.callbackText = 'Esta confirmação expirou. Envie o lembrete novamente.';\n      result.showAlert = true;\n      return [{ json: result }];\n    }\n\n    if (action === 'discard') {\n      delete state.pending[key];\n      result.callbackText = 'Lembrete descartado.';\n      return [{ json: result }];\n    }\n\n    const activeCount = state.reminders.filter(\n      (reminder) => reminder.chatId === chatId && ['active', 'sent'].includes(reminder.status),\n    ).length;\n    if (activeCount >= CONFIG.maxRemindersPerChat) {\n      result.callbackText = `Limite de ${CONFIG.maxRemindersPerChat} lembretes atingido.`;\n      result.showAlert = true;\n      return [{ json: result }];\n    }\n\n    const reminder = {\n      id: state.nextId++,\n      chatId,\n      userId,\n      text: pending.text,\n      nextAt: pending.nextAt,\n      recurrence: pending.recurrence || null,\n      status: 'active',\n      createdAt: now,\n      updatedAt: now,\n    };\n    state.reminders.push(reminder);\n    delete state.pending[key];\n    result.callbackText = `Lembrete #${reminder.id} criado para ${formatDate(reminder.nextAt)}.`;\n    return [{ json: result }];\n  }\n\n  const done = callbackData.match(/^done:(\\d+)$/);\n  if (done) {\n    const id = Number(done[1]);\n    const reminder = state.reminders.find((item) => item.id === id && item.chatId === chatId);\n    if (!reminder) {\n      result.callbackText = 'Lembrete não encontrado.';\n      result.showAlert = true;\n      return [{ json: result }];\n    }\n    if (reminder.recurrence) {\n      reminder.lastAcknowledgedAt = now;\n      reminder.updatedAt = now;\n      result.callbackText = `Lembrete #${id} concluído. A próxima recorrência continua ativa.`;\n    } else {\n      reminder.status = 'completed';\n      reminder.completedAt = now;\n      reminder.updatedAt = now;\n      result.callbackText = `Lembrete #${id} concluído.`;\n    }\n    return [{ json: result }];\n  }\n\n  const snooze = callbackData.match(/^snooze:(10|60):(\\d+)$/);\n  if (snooze) {\n    const minutes = Number(snooze[1]);\n    const id = Number(snooze[2]);\n    const reminder = state.reminders.find((item) => item.id === id && item.chatId === chatId);\n    if (!reminder) {\n      result.callbackText = 'Lembrete não encontrado.';\n      result.showAlert = true;\n      return [{ json: result }];\n    }\n\n    if (reminder.recurrence) {\n      const snoozed = {\n        id: state.nextId++,\n        chatId,\n        userId,\n        text: reminder.text,\n        nextAt: now + minutes * 60000,\n        recurrence: null,\n        status: 'active',\n        parentId: reminder.id,\n        createdAt: now,\n        updatedAt: now,\n      };\n      state.reminders.push(snoozed);\n      result.callbackText = `Ocorrência adiada por ${minutes} minutos (#${snoozed.id}).`;\n    } else {\n      reminder.nextAt = now + minutes * 60000;\n      reminder.status = 'active';\n      reminder.snoozedAt = now;\n      reminder.updatedAt = now;\n      result.callbackText = `Lembrete #${id} adiado por ${minutes} minutos.`;\n    }\n    return [{ json: result }];\n  }\n\n  return [{ json: result }];\n}\n\nconst rawText = String(message?.text || '').trim();\nif (!rawText) {\n  return [{ json: {\n    isCallback: false,\n    hasKeyboard: false,\n    chatId,\n    reply: 'Envie uma mensagem de texto com o lembrete. Use /ajuda para ver exemplos.',\n  } }];\n}\n\nconst command = normalize(rawText.split(/\\s+/)[0]).split('@')[0];\nif (['/start', '/ajuda', '/help'].includes(command)) {\n  return [{ json: { isCallback: false, hasKeyboard: false, chatId, reply: helpMessage } }];\n}\n\nif (command === '/listar' || command === '/hoje') {\n  let reminders = state.reminders.filter(\n    (reminder) => reminder.chatId === chatId && ['active', 'sent'].includes(reminder.status),\n  );\n  if (command === '/hoje') {\n    const today = localDateKey(now);\n    reminders = reminders.filter(\n      (reminder) => reminder.status === 'active' && localDateKey(reminder.nextAt) === today,\n    );\n  }\n  reminders.sort((a, b) => Number(a.nextAt) - Number(b.nextAt));\n  const total = reminders.length;\n  const visible = reminders.slice(0, CONFIG.listLimit);\n  const title = command === '/hoje' ? '📅 <b>Lembretes de hoje</b>' : '📋 <b>Próximos lembretes</b>';\n  const lines = visible.map((reminder) => {\n    const status = reminder.status === 'sent' ? 'aguardando ação' : formatDate(reminder.nextAt);\n    const repeat = reminder.recurrence ? ` · ${recurrenceLabel(reminder.recurrence)}` : '';\n    return `<b>#${reminder.id}</b> — ${escapeHtml(reminder.text)}\\n${escapeHtml(status)}${escapeHtml(repeat)}`;\n  });\n  const suffix = total > visible.length ? `\\n\\n...e mais ${total - visible.length}.` : '';\n  const reply = lines.length ? `${title}\\n\\n${lines.join('\\n\\n')}${suffix}` : `${title}\\n\\nNenhum lembrete encontrado.`;\n  return [{ json: { isCallback: false, hasKeyboard: false, chatId, reply } }];\n}\n\nif (command === '/cancelar') {\n  const id = Number(rawText.match(/^\\/cancelar(?:@\\w+)?\\s+(\\d+)/i)?.[1]);\n  if (!id) {\n    return [{ json: {\n      isCallback: false,\n      hasKeyboard: false,\n      chatId,\n      reply: 'Uso correto: <code>/cancelar 12</code>',\n    } }];\n  }\n  const reminder = state.reminders.find(\n    (item) => item.id === id && item.chatId === chatId && ['active', 'sent'].includes(item.status),\n  );\n  if (!reminder) {\n    return [{ json: {\n      isCallback: false,\n      hasKeyboard: false,\n      chatId,\n      reply: `Não encontrei um lembrete ativo com o número <b>#${id}</b>.`,\n    } }];\n  }\n  reminder.status = 'cancelled';\n  reminder.cancelledAt = now;\n  reminder.updatedAt = now;\n  return [{ json: {\n    isCallback: false,\n    hasKeyboard: false,\n    chatId,\n    reply: `🗑️ Lembrete <b>#${id}</b> cancelado.`,\n  } }];\n}\n\nconst weekdayDefinitions = [\n  { index: 0, names: ['domingo'], label: 'domingo' },\n  { index: 1, names: ['segunda', 'segunda-feira'], label: 'segunda-feira' },\n  { index: 2, names: ['terca', 'terca-feira'], label: 'terça-feira' },\n  { index: 3, names: ['quarta', 'quarta-feira'], label: 'quarta-feira' },\n  { index: 4, names: ['quinta', 'quinta-feira'], label: 'quinta-feira' },\n  { index: 5, names: ['sexta', 'sexta-feira'], label: 'sexta-feira' },\n  { index: 6, names: ['sabado'], label: 'sábado' },\n];\nconst normalizedText = normalize(rawText);\nconst findWeekday = (text) => weekdayDefinitions.find(\n  (weekday) => weekday.names.some((name) => new RegExp(`\\\\b${name}\\\\b`).test(text)),\n);\nconst extractTime = (text) => {\n  const patterns = [\n    /\\b(?:as)\\s*(\\d{1,2})(?:(?::|h)(\\d{2}))?\\s*(?:horas?)?\\b/i,\n    /\\b(\\d{1,2})h(?:(\\d{2}))?\\b/i,\n    /\\b(\\d{1,2}):(\\d{2})\\b/i,\n  ];\n  for (const pattern of patterns) {\n    const match = text.match(pattern);\n    if (!match) continue;\n    const hour = Number(match[1]);\n    const minute = Number(match[2] || 0);\n    if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) return { hour, minute };\n  }\n  return null;\n};\n\nconst relativeMatch = normalizedText.match(/\\bdaqui\\s+a\\s+(\\d+)\\s*(minutos?|mins?|horas?|dias?)\\b/i);\nlet nextAt = 0;\nlet recurrence = null;\nlet parseError = '';\nlet time = extractTime(normalizedText);\nlet recognizedDate = false;\n\nconst daily = /\\b(todo\\s+dia|todos\\s+os\\s+dias|diariamente)\\b/i.test(normalizedText);\nconst weeklyMatch = normalizedText.match(/\\btod[ao]\\s+(domingo|segunda(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sabado)\\b/i);\nconst weeklyDay = weeklyMatch ? findWeekday(weeklyMatch[1]) : null;\n\nif (relativeMatch) {\n  const amount = Number(relativeMatch[1]);\n  const unit = relativeMatch[2];\n  const multiplier = unit.startsWith('min') ? 60000 : unit.startsWith('hora') ? 3600000 : 86400000;\n  nextAt = now + amount * multiplier;\n  recognizedDate = amount > 0;\n  if (!recognizedDate) parseError = 'O intervalo precisa ser maior que zero.';\n} else {\n  if (!time) {\n    parseError = 'Não consegui identificar o horário. Exemplos: <code>às 09:30</code> ou <code>às 9h</code>.';\n  } else if (daily) {\n    recurrence = { type: 'daily' };\n    nextAt = timestampForDayOffset(now, 0, time.hour, time.minute);\n    if (nextAt <= now) nextAt = timestampForDayOffset(now, 1, time.hour, time.minute);\n    recognizedDate = true;\n  } else if (weeklyDay) {\n    recurrence = {\n      type: 'weekly',\n      weekday: weeklyDay.index,\n      weekdayName: weeklyDay.label,\n    };\n    const todayParts = localParts(now);\n    const todayWeekday = new Date(Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day)).getUTCDay();\n    let daysAhead = (weeklyDay.index - todayWeekday + 7) % 7;\n    nextAt = timestampForDayOffset(now, daysAhead, time.hour, time.minute);\n    if (nextAt <= now) {\n      daysAhead += 7;\n      nextAt = timestampForDayOffset(now, daysAhead, time.hour, time.minute);\n    }\n    recognizedDate = true;\n  } else {\n    const current = localParts(now);\n    if (/\\bamanha\\b/i.test(normalizedText)) {\n      nextAt = timestampForDayOffset(now, 1, time.hour, time.minute);\n      recognizedDate = true;\n    } else if (/\\bhoje\\b/i.test(normalizedText)) {\n      nextAt = timestampForDayOffset(now, 0, time.hour, time.minute);\n      recognizedDate = true;\n      if (nextAt <= now) parseError = 'Esse horário de hoje já passou.';\n    } else {\n      const dateMatch = normalizedText.match(/\\b(?:dia\\s+)?(\\d{1,2})\\/(\\d{1,2})(?:\\/(\\d{2,4}))?\\b/);\n      if (dateMatch) {\n        const day = Number(dateMatch[1]);\n        const month = Number(dateMatch[2]);\n        let year = dateMatch[3] ? Number(dateMatch[3]) : current.year;\n        if (year < 100) year += 2000;\n        nextAt = zonedToUtc(year, month, day, time.hour, time.minute);\n        const check = localParts(nextAt);\n        if (check.year !== year || check.month !== month || check.day !== day) {\n          parseError = 'A data informada não existe.';\n        } else if (!dateMatch[3] && nextAt <= now) {\n          year += 1;\n          nextAt = zonedToUtc(year, month, day, time.hour, time.minute);\n        }\n        recognizedDate = true;\n      } else {\n        const weekday = findWeekday(normalizedText);\n        if (weekday) {\n          const todayWeekday = new Date(Date.UTC(current.year, current.month - 1, current.day)).getUTCDay();\n          let daysAhead = (weekday.index - todayWeekday + 7) % 7;\n          nextAt = timestampForDayOffset(now, daysAhead, time.hour, time.minute);\n          if (nextAt <= now) {\n            daysAhead += 7;\n            nextAt = timestampForDayOffset(now, daysAhead, time.hour, time.minute);\n          }\n          recognizedDate = true;\n        } else {\n          nextAt = timestampForDayOffset(now, 0, time.hour, time.minute);\n          if (nextAt <= now) nextAt = timestampForDayOffset(now, 1, time.hour, time.minute);\n          recognizedDate = true;\n        }\n      }\n    }\n  }\n}\n\nlet reminderText = rawText\n  .replace(/^(?:me\\s+)?lembre(?:-me)?(?:\\s+de)?\\s*/i, '')\n  .replace(/\\bdaqui\\s+a\\s+\\d+\\s*(?:minutos?|mins?|horas?|dias?)\\b/gi, '')\n  .replace(/\\b(?:todo\\s+dia|todos\\s+os\\s+dias|diariamente)\\b/gi, '')\n  .replace(/\\btod[ao]\\s+(?:domingo|segunda(?:-feira)?|terça(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sábado|sabado)\\b/gi, '')\n  .replace(/\\b(?:hoje|amanhã|amanha)\\b/gi, '')\n  .replace(/\\b(?:dia\\s+)?\\d{1,2}\\/\\d{1,2}(?:\\/\\d{2,4})?\\b/gi, '')\n  .replace(/\\b(?:próxima|proxima)?\\s*(?:domingo|segunda(?:-feira)?|terça(?:-feira)?|terca(?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|sábado|sabado)\\b/gi, '')\n  .replace(/\\b(?:às|as)\\s*\\d{1,2}(?::\\d{2}|h\\d{0,2})?\\s*(?:horas?)?\\b/gi, '')\n  .replace(/\\b\\d{1,2}h(?:\\d{2})?\\b/gi, '')\n  .replace(/\\b\\d{1,2}:\\d{2}\\b/gi, '')\n  .replace(/^\\s*(?:de|para)\\s+/i, '')\n  .replace(/\\s+/g, ' ')\n  .replace(/^[,;:\\-–—.\\s]+|[,;:\\-–—.\\s]+$/g, '')\n  .trim();\n\nif (!recognizedDate && !parseError) {\n  parseError = 'Não consegui identificar quando devo lembrar.';\n}\nif (!reminderText) {\n  parseError = 'Não consegui identificar o texto do lembrete.';\n}\nif (nextAt && nextAt < now + 15000) {\n  parseError = 'O horário precisa estar no futuro.';\n}\n\nif (parseError) {\n  return [{ json: {\n    isCallback: false,\n    hasKeyboard: false,\n    chatId,\n    reply: `⚠️ ${parseError}\\n\\nUse /ajuda para ver exemplos.`,\n  } }];\n}\n\nconst token = `${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`;\nconst key = `${chatId}:${token}`;\nstate.pending[key] = {\n  token,\n  chatId,\n  userId,\n  text: reminderText,\n  nextAt,\n  recurrence,\n  createdAt: now,\n  expiresAt: now + CONFIG.pendingMinutes * 60000,\n};\n\nconst recurrenceText = recurrence ? `\\n<b>Repetição:</b> ${escapeHtml(recurrenceLabel(recurrence))}` : '';\nreturn [{ json: {\n  isCallback: false,\n  hasKeyboard: true,\n  chatId,\n  confirmData: `confirm:${token}`,\n  discardData: `discard:${token}`,\n  reply: `🔔 <b>Confirmar lembrete</b>\\n\\n<b>Mensagem:</b> ${escapeHtml(reminderText)}\\n<b>Quando:</b> ${escapeHtml(formatDate(nextAt))}${recurrenceText}\\n\\nConfirme em até ${CONFIG.pendingMinutes} minutos.`,\n} }];\n"
+      },
+      "id": "104e090a-2094-4652-ac30-406dd078959c",
+      "name": "Processar mensagem e comandos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -500,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8cb4b827-c21c-49c1-9b4d-34662b3e90cc",
+              "leftValue": "={{ $json.isCallback }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "fd45c49d-2828-452f-b8b0-111cbdfb0e57",
+      "name": "E resposta de botao",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -240,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.queryId }}",
+        "additionalFields": {
+          "cache_time": 0,
+          "show_alert": "={{ $json.showAlert }}",
+          "text": "={{ $json.callbackText }}"
+        }
+      },
+      "id": "7098513e-381c-4119-8cc1-7c662d6d4c69",
+      "name": "Responder botao",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        20,
+        -100
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "158651f5-23aa-4f70-93b5-c11cb7e085e0",
+              "leftValue": "={{ $json.hasKeyboard }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c8a71bed-bbab-4125-b624-9ab75cbdc96a",
+      "name": "Precisa confirmar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        20,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.reply }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Confirmar",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.confirmData }}"
+                    }
+                  },
+                  {
+                    "text": "❌ Descartar",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.discardData }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "e6787fe9-115d-4b0e-a298-059230dbb2c2",
+      "name": "Pedir confirmacao",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        300,
+        60
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.reply }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "95518884-d30c-4cf4-9669-b18c04421425",
+      "name": "Responder mensagem",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        300,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "8ac7ac32-0821-4978-9f85-89d76a87d89d",
+      "name": "Verificar a cada minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -500,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const CONFIG = {\n  timezone: 'America/Sao_Paulo',\n  maxPerRun: 50,\n};\n\nconst state = $getWorkflowStaticData('global');\nstate.reminders = Array.isArray(state.reminders) ? state.reminders : [];\nconst now = Date.now();\n\nconst escapeHtml = (value) => String(value ?? '')\n  .replaceAll('&', '&amp;')\n  .replaceAll('<', '&lt;')\n  .replaceAll('>', '&gt;');\nconst partsFormatter = new Intl.DateTimeFormat('en-CA', {\n  timeZone: CONFIG.timezone,\n  year: 'numeric',\n  month: '2-digit',\n  day: '2-digit',\n  hour: '2-digit',\n  minute: '2-digit',\n  hourCycle: 'h23',\n});\nconst localParts = (timestamp) => {\n  const result = {};\n  for (const part of partsFormatter.formatToParts(new Date(timestamp))) {\n    if (part.type !== 'literal') result[part.type] = Number(part.value);\n  }\n  return result;\n};\nconst zonedToUtc = (year, month, day, hour, minute) => {\n  const desired = Date.UTC(year, month - 1, day, hour, minute, 0);\n  let candidate = desired;\n  for (let attempt = 0; attempt < 3; attempt++) {\n    const actual = localParts(candidate);\n    const represented = Date.UTC(\n      actual.year,\n      actual.month - 1,\n      actual.day,\n      actual.hour,\n      actual.minute,\n      0,\n    );\n    candidate += desired - represented;\n  }\n  return candidate;\n};\nconst shiftLocalDays = (timestamp, days) => {\n  const parts = localParts(timestamp);\n  const shifted = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));\n  return zonedToUtc(\n    shifted.getUTCFullYear(),\n    shifted.getUTCMonth() + 1,\n    shifted.getUTCDate(),\n    parts.hour,\n    parts.minute,\n  );\n};\nconst nextOccurrence = (reminder) => {\n  let candidate = Number(reminder.nextAt);\n  const stepDays = reminder.recurrence?.type === 'weekly' ? 7 : 1;\n  let guard = 0;\n  do {\n    candidate = shiftLocalDays(candidate, stepDays);\n    guard++;\n  } while (candidate <= now && guard < 370);\n  return candidate;\n};\n\nconst due = state.reminders\n  .filter((reminder) => reminder.status === 'active' && Number(reminder.nextAt) <= now)\n  .sort((a, b) => Number(a.nextAt) - Number(b.nextAt))\n  .slice(0, CONFIG.maxPerRun);\n\nconst output = [];\nfor (const reminder of due) {\n  const occurrenceAt = Number(reminder.nextAt);\n  reminder.lastSentAt = now;\n  reminder.updatedAt = now;\n\n  if (reminder.recurrence) {\n    reminder.nextAt = nextOccurrence(reminder);\n  } else {\n    reminder.status = 'sent';\n    reminder.sentAt = now;\n  }\n\n  const recurrenceText = reminder.recurrence\n    ? '\\n\\nEste lembrete é recorrente; a próxima ocorrência já foi agendada.'\n    : '';\n  output.push({\n    json: {\n      chatId: reminder.chatId,\n      reminderId: reminder.id,\n      doneData: `done:${reminder.id}`,\n      snooze10Data: `snooze:10:${reminder.id}`,\n      snooze60Data: `snooze:60:${reminder.id}`,\n      message: `⏰ <b>LEMBRETE #${reminder.id}</b>\\n\\n${escapeHtml(reminder.text)}${recurrenceText}`,\n      occurrenceAt,\n    },\n  });\n}\n\nreturn output;\n"
+      },
+      "id": "cbd25f66-b7eb-4ec2-b03e-8c87e8e115a5",
+      "name": "Buscar lembretes vencidos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.message }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Concluído",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.doneData }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "⏱ +10 min",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.snooze10Data }}"
+                    }
+                  },
+                  {
+                    "text": "🕐 +1 hora",
+                    "additionalFields": {
+                      "callback_data": "={{ $json.snooze60Data }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "94e479f8-186e-4eac-a39c-31034ee9a945",
+      "name": "Enviar lembrete",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        60,
+        500
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "content": "## Configuração obrigatória\n\n1. Troque `SUBSTITUA_PELO_CHAT_ID` no node **Receber mensagem Telegram**.\n2. Selecione a mesma credencial do bot nos cinco nodes Telegram.\n3. Publique/ative o workflow para registrar o webhook.\n4. Envie `/ajuda` ao bot.\n\nO Telegram permite somente um Telegram Trigger ativo por bot.",
+        "height": 320,
+        "width": 500,
+        "color": 5
+      },
+      "id": "e4ebc5de-2acf-48a1-bfa7-8710f9dfba97",
+      "name": "Configurar antes de ativar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -780,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Recursos\n\n- Linguagem natural em português\n- Confirmação por botões\n- `/listar`, `/hoje`, `/cancelar ID`\n- Lembretes diários e semanais\n- Concluir ou adiar por 10/60 minutos\n- Estado persistente no próprio workflow\n- Fuso `America/Sao_Paulo`",
+        "height": 300,
+        "width": 440,
+        "color": 4
+      },
+      "id": "84105a9f-10dc-42d5-8f25-59fe4dc34be9",
+      "name": "Recursos do chatbot",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        60,
+        -360
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receber mensagem Telegram": {
+      "main": [
+        [
+          {
+            "node": "Processar mensagem e comandos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar mensagem e comandos": {
+      "main": [
+        [
+          {
+            "node": "E resposta de botao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E resposta de botao": {
+      "main": [
+        [
+          {
+            "node": "Responder botao",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Precisa confirmar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Precisa confirmar": {
+      "main": [
+        [
+          {
+            "node": "Pedir confirmacao",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar a cada minuto": {
+      "main": [
+        [
+          {
+            "node": "Buscar lembretes vencidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar lembretes vencidos": {
+      "main": [
+        [
+          {
+            "node": "Enviar lembrete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "versionId": "f10c6823-5ccf-4d10-8117-7453732f8f07",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

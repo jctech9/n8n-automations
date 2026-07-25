@@ -109,8 +109,99 @@ Como o próprio n8n roda na máquina monitorada, ele não consegue enviar uma me
 - Mantenha autenticação SSH por senha desabilitada se ela não for necessária.
 - O workflow começa desativado para que as credenciais e o Chat ID sejam configurados antes da publicação.
 
+## 02 — Chatbot de lembretes pelo Telegram
+
+Arquivo para importar:
+
+`workflows/02-chatbot-lembretes-telegram.json`
+
+O chatbot recebe mensagens em português, apresenta uma prévia com botões de confirmação e envia o lembrete no horário programado. Não utiliza API de IA: a interpretação é local, determinística e sem custo externo.
+
+Exemplos reconhecidos:
+
+```text
+Me lembre amanhã às 09:30 de pagar a internet
+Daqui a 20 minutos desligar o forno
+Hoje às 18h ligar para João
+Dia 05/08 às 14h renovar o documento
+Segunda às 10h enviar a proposta
+Todo dia às 08h tomar o remédio
+Toda sexta às 17h enviar o relatório
+```
+
+Comandos disponíveis:
+
+| Comando | Ação |
+|---|---|
+| `/start` ou `/ajuda` | Mostra instruções e exemplos |
+| `/listar` | Lista os próximos lembretes |
+| `/hoje` | Lista os lembretes do dia |
+| `/cancelar 12` | Cancela o lembrete de número 12 |
+
+Quando um lembrete é enviado, o Telegram apresenta botões para:
+
+- marcar como concluído;
+- adiar por 10 minutos;
+- adiar por uma hora.
+
+Lembretes recorrentes continuam com a próxima ocorrência ativa quando são concluídos. Se uma ocorrência recorrente for adiada, o chatbot cria um lembrete avulso para o adiamento sem alterar a agenda original.
+
+### Configuração
+
+1. Importe `workflows/02-chatbot-lembretes-telegram.json`.
+2. Abra o node **Receber mensagem Telegram**.
+3. Substitua `SUBSTITUA_PELO_CHAT_ID` pelo seu Chat ID.
+   - Para permitir mais de um usuário, informe os IDs separados por vírgula.
+   - Essa restrição impede que desconhecidos criem lembretes no bot.
+4. Selecione a mesma credencial do bot em:
+   - **Receber mensagem Telegram**
+   - **Responder botao**
+   - **Pedir confirmacao**
+   - **Responder mensagem**
+   - **Enviar lembrete**
+5. Salve e publique/ative o workflow.
+6. Envie `/ajuda` ao bot.
+
+O n8n precisa estar acessível por HTTPS para que o Telegram consiga entregar eventos ao Telegram Trigger. O Telegram permite somente um Telegram Trigger ativo por bot; use um bot exclusivo para este chatbot se outro workflow já estiver recebendo mensagens com a mesma credencial.
+
+### Armazenamento
+
+Os lembretes ficam no estado persistente global do próprio workflow. Isso simplifica a instalação porque não exige PostgreSQL, planilha ou Data Table adicional.
+
+Pontos importantes:
+
+- os lembretes persistem entre execuções e reinicializações normais;
+- execuções manuais de teste não devem ser usadas para validar persistência; teste enviando mensagens ao webhook publicado;
+- exportar somente o JSON do workflow não inclui os lembretes armazenados;
+- faça backup do banco de dados/volume do n8n para proteger os lembretes;
+- lembretes concluídos ou cancelados são retidos por 90 dias;
+- o limite padrão é de 500 lembretes ativos por chat.
+
+### Fuso horário
+
+O workflow utiliza `America/Sao_Paulo`. Para mudar, altere `CONFIG.timezone` nos nodes:
+
+- **Processar mensagem e comandos**
+- **Buscar lembretes vencidos**
+
+Também altere `settings.timezone` do workflow.
+
+### Desenvolvimento
+
+Os códigos dos nodes ficam em:
+
+- `workflow-sources/02-reminder-chatbot/process-message.js`
+- `workflow-sources/02-reminder-chatbot/dispatch-due.js`
+
+Depois de modificá-los, gere novamente o workflow:
+
+```bash
+node scripts/build-reminder-workflow.mjs
+```
+
 ## Fontes
 
 - Código-fonte do n8n: <https://github.com/n8n-io/n8n>
 - Node Telegram: <https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.telegram/>
+- Telegram Trigger: <https://docs.n8n.io/integrations/builtin/trigger-nodes/n8n-nodes-base.telegramtrigger/>
 - Node SSH: <https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.ssh/>
